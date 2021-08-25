@@ -51,8 +51,8 @@ title="Descriptive statistics County level Table 2",digits=1, out="table2.txt")
 ```
 
 ```{r}
-head(dfrmdhmdacensus)
-stargazer(df_filter_hmda_paper[c("Credit_Score","applicantincome","amountofloan","Original_Interest_Rate","diff_interest_mean","Original_DTI_Ratio","diff_interest_median","Original_Combined_LTV","property_val", "year")], type = "latex",title="Descriptive statistics individual level Table 1",digits=1, out="New Table 1.txt")
+final_race_eth_data$Credit_Score <- (final_race_eth_data$Credit_Score)*100
+stargazer(final_race_eth_data[c("Credit_Score","applicantincome","amountofloan","Original_Interest_Rate","diff_interest_mean","Original_DTI_Ratio","diff_interest_median","Original_Combined_LTV","property_val", "year")], type = "latex",title="Descriptive statistics individual level Table 1",digits=1, out="New Table 1.txt")
 
 ```
 
