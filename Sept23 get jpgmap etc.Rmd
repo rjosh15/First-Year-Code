@@ -1,0 +1,518 @@
+---
+title: "Paper data and tables and fig"
+author: "Ravi Joshi"
+date: "8/5/2021"
+output: pdf_document
+getwd()
+df_all_numeric <- read.csv("final_hmd_bbd_census_numeric.csv")
+install.packages("ggplot2")
+library("ggplot2")
+install.packages("data.table")           # Install and load data.table
+library("data.table")
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+#install.packages("stargazer") #Use this to install it, do this only once
+library(stargazer)
+getwd()
+```{r}
+df_county_year <- read.csv("Filter_final_data_countyid_paper.csv")
+dfrmdhmdacensus <- read.csv("Filter_final_data_paper_Hmdacensus.csv")
+dfrmdhmdacensus$amountofloan <- (dfrmdhmdacensus$amountofloan)*1000
+dfrmdhmdacensus$applicantincome <- (dfrmdhmdacensus$applicantincome)*1000
+
+dfrmdhmdacensus <- dfrmdhmdacensus[,-1]
+head(dfrmdhmdacensus)
+```
+
+```{r}
+-------------------Filter Data-------------------------
+df_filter_hmda_paper <- sqldf("select * from dfrmdhmdacensus where Credit_Score>= 620 and Credit_Score<= 850 and applicantincome >= 30000 and applicantincome <= 300000 and amountofloan >= 50000 and amountofloan <= 700000 and Original_DTI_Ratio >= 5 and Original_DTI_Ratio <= 70 and Original_Combined_LTV >= 20 and Original_Combined_LTV <= 120 and property_val<= 2000000 ;")
+head(df_filter_hmda_paper)
+```
+head(df_all_numeric)
+
+```{r}
+race_eth_data_1 <- sqldf("SELECT *  from df_all_numeric  where derived_race not in ('Race Not Available','Free Form Text Only', 'Joint', '2 or more minority race')
+and derived_ethnicity not in ('Ethnicity Not Available','Free Form Text Only', 'Joint');")
+##grep("ratio", colnames(race_eth_data_1))
+##colnames(race_eth_data_1)[69] <- "BBD Penetration"
+race_eth_data_1$ Credit_Score <- (race_eth_data_1$Credit_Score)*100
+race_eth_data_1$ applicantincome <- (race_eth_data_1$applicantincome)*1000
+race_eth_data_1$ amountofloan <- (race_eth_data_1$amountofloan)*1000
+final_race_eth_data <- sqldf("select * from race_eth_data_1 where Credit_Score>= 620 and Credit_Score<= 850 and applicantincome >= 30000 and applicantincome <= 300000 and amountofloan >= 50000 and amountofloan <= 700000 and Original_DTI_Ratio >= 5 and Original_DTI_Ratio <= 70 and Original_Combined_LTV >= 20 and Original_Combined_LTV <= 120 and property_val<= 2000000 ;")
+
+final_race_eth_data$ Credit_Score <- (final_race_eth_data$Credit_Score)/100
+
+summary(final_race_eth_data$Credit_Score)
+head(race_eth_data_1)
+```
+
+```{r}
+df_county_year <- read.csv("Filter_final_data_countyid_paper.csv")
+stargazer(df_county_year[c("Credit_Score","applicantincome","amountofloan","Original_Interest_Rate","Original_DTI_Ratio","Original_Combined_LTV","Original_UPB","property_val","poverty_percentage","est_population","derived_race","combined_loan_to_value_ratio","year","ratio","absolute_penetration","ratio_ms_usage")], type = "text",
+title="Descriptive statistics County level Table 2",digits=1, out="table2.txt")
+```
+
+```{r}
+final_race_eth_data$Credit_Score <- (final_race_eth_data$Credit_Score)*100
+stargazer(final_race_eth_data[c("Credit_Score","applicantincome","amountofloan","Original_Interest_Rate","diff_interest_mean","Original_DTI_Ratio","diff_interest_median","Original_Combined_LTV","property_val", "year")], type = "text",title="Descriptive statistics individual level Table 1",digits=1, out="New Table 1.txt")
+
+```
+
+```{r}
+
+df_population_penetration_all_years <- read.csv("df_final_income_population.csv")
+ install.packages("sqldf")
+ library("sqldf")
+ data_bbd_filter_18_20 <- sqldf(" select countyid, year, ratio from df_all_numeric where year in (2018,2019,2020) group by year, countyid ;")
+ nrow(data_bbd_filter_18_20)
+ unique(data_bbd_filter_18_20$year)
+ data_bbd <- sqldf("SELECT year, AVG(ratio) AS broadband_penetration from df_population_penetration_all_years where year in (2016,2017) and month = 6 group by year
+ UNION
+ select year, AVG(ratio) AS broadband_penetration from data_bbd_filter_18_20 group by year;")
+ 
+ p <- ggplot(data= data_bbd, aes(x=year, y= broadband_penetration),color="Red")+ geom_line()+ggtitle("") +
+  xlab("Year") + ylab("Broadband Penetration")
+plot(p)
+```
+str(df_population_penetration_all_years)
+```{r}
+data_bbd_filter_all_year <- sqldf(" select year, ratio from df_population_penetration_all_years where year in (2009,2010,2011,2012,2013,2014,2016,2016,2017,2018) and month = 6 group by year ;")
+data_bbd_filter_all_year$ratio <- as.numeric(data_bbd_filter_all_year$ratio)
+str(data_bbd_filter_all_year)
+                  ##### Normal Density and Histogram#################
+
+r <- data_bbd_filter_all_year$ratio
+head(r)
+m<-mean(r)
+std<-sqrt(var(r))
+hist(r, density=20, breaks=2, prob=TRUE, 
+     xlab="Broadband Penetration", ylim=c(0,4), 
+     main="",cex.lab=0.75, cex.axis=0.75, cex.main=0.75, cex.sub=0.75)
+curve(dnorm(x, mean=m, sd=std), 
+      col="darkred", lwd=2, add=TRUE, yaxt="n")
+
+
+```
+```{r}
+df_map_2018 <- sqldf("select * from data_bbd_filter_18_20 where year=2018;")
+df_map_2019 <- sqldf("select * from data_bbd_filter_18_20 where year=2019;")
+df_map_2020 <- sqldf("select * from data_bbd_filter_18_20 where year=2020;")
+head(df_map_2018)
+df_map_2018$fips <- df_map_2018$countyid 
+df_map_2019$fips <- df_map_2019$countyid
+df_map_2020$fips <- df_map_2020$countyid
+df_map_2018$R18 <- df_map_2018$ratio
+df_map_2019$R19 <- df_map_2019$ratio
+df_map_2020$R20 <- df_map_2020$ratio
+df_map_union_2018_2019 <- sqldf("select * from df_map_2018 a left join df_map_2019 b on a.fips=b.fips ;")
+nrow(df_map_2019)
+head(df_map_union_2018_2019)
+df_map_union_2018_2019 <- df_map_union_2018_2019[,-6]
+
+filter_map_20182019 <- sqldf("select * from df_map_union_2018_2019 where R19 is not NULL;")
+head(filter_map_20182019)
+
+
+filter_map_20182019$Percent.Change18_19 <- (filter_map_20182019$R19 - filter_map_20182019$R18)*100/filter_map_20182019$R18
+
+head(filter_map_20182019)
+--------------------------2019-2020---------------------------------------
+df_map_union_2019_2020 <- sqldf("select * from df_map_2019 a left join df_map_2020 b on a.fips=b.fips ;")
+head(df_map_union_2019_2020)
+
+df_map_union_2019_2020 <- df_map_union_2019_2020[,-6]
+filter_map_2019_2020 <- sqldf("select * from df_map_union_2019_2020 where R20 is not NULL;")
+filter_map_2019_2020$Percent.Change19_20 <- (filter_map_2019_2020$R20 - filter_map_2019_2020$R19)*100/filter_map_2019_2020$R19
+head(filter_map_2019_2020)
+```
+---------------------Map ---19--20----------------------------------
+```{r}
+install.packages("usmap")
+library("usmap")
+plot_usmap(data = filter_map_2019_2020, values = "R20") + scale_fill_continuous(
+    low = "green", high = "magenta",
+  name = "Broadband Penetration 2020", label = scales::comma) + 
+  theme(legend.position = "bottom")
+``` 
+  
+-----------------------------18-20---------------------------------------------------
+```{r}
+df_map_union_2018_2020 <- sqldf("select * from df_map_2018 a left join df_map_2020 b on a.fips=b.fips ;")
+df_map_union_2018_2020 <- df_map_union_2018_2020[,-6]
+filter_map_2018_2020 <- sqldf("select * from df_map_union_2018_2020 where R20 is not NULL;")
+filter_map_2018_2020$Change1820 <- (filter_map_2018_2020$R20 - filter_map_2018_2020$R18)*100/filter_map_2018_2020$R18
+head(filter_map_2018_2020)
+
+df_filter_map_change_25<- sqldf("select * from filter_map_2018_2020 where Change1820 < 25 ;")
+ df_filter_map_change_40_100<- sqldf("select * from filter_map_2018_2020 where Change1820 >=40 and Change1820<=100;")
+ df_filter_map_change_25_40<- sqldf("select * from filter_map_2018_2020 where Change1820 >=25 and Change1820 <40 ;")
+ 
+  df_filter_map_change_100_800<- sqldf("select * from filter_map_2018_2020 where Change1820 > 100 and Change1820<800;")
+head(filter_map_2018_2020)
+```
+
+```{r}
+temp <- data.table(filter_map_2018_2020)
+temp[,bb_change_category:= ifelse(Change1820<25,"1. Less than 25",ifelse(Change1820<40,"2. 25-to 40",
+ifelse(Change1820<100,"3. 40-100","4. More than 100")))]
+head(temp)
+temp_join <- join_all(list (dfrmdhmdacensus,temp), by=c('countyid','year'), type='left')
+felm(Original_Interest_Rate ~ Change1820+Credit_Score+Original_DTI_Ratio|year,data=temp_join)
+  stargazer(temp_join,title="Regression Results",single.row= TRUE, align=TRUE,type="text",intercept.bottom = FALSE, out="temp.txt")
+head(temp_join)
+
+```
+
+
+
+```{r}
+ -----------------------------Change Col Names--------------------------
+head(df_filter_map_change_25)
+head(df_filter_map_change_40_100)
+head(df_filter_map_change_25_40)
+head(df_filter_map_change_100_800)
+colnames(df_filter_map_change_25)[10] <- "change_25"
+colnames(df_filter_map_change_40_100)[10] <- "change_40100"
+colnames(df_filter_map_change_25_40)[10] <- "change_2540"
+colnames(df_filter_map_change_100_800)[10] <- "change_100"
+```
+------------------------------------race ethnicity data1---------------------------
+
+-
+
+--------------------------------Join map bbd data final regression------------------
+```{r}
+library(dplyr)
+df25 <- select(df_filter_map_change_25, -(ratio:R20))
+df2540<- select(df_filter_map_change_25_40, -(ratio:R20))
+df40100<- select(df_filter_map_change_40_100, -(ratio:R20))
+df100<- select(df_filter_map_change_100_800, -(ratio:R20))
+library(plyr)
+y <- join_all(list (race_eth_data_1,df2540), by=c('countyid','year'), type='left')
+z <- join_all(list (y,df40100), by=c('countyid','year'), type='left')
+y1 <- join_all(list (z,df25), by=c('countyid','year'), type='left')
+z1 <- join_all(list (y1,df100), by= c('countyid','year'), type='left')
+z1$fips <- z1$countyid
+su(z1)
+----------------------------------------------------------------------------------------
+df_z1 <- sqldf("select *, 
+                CASE when change_25 is not null then ch25
+                CASE when change_2540 is not null then ch2540
+                CASE when change_40100 is not null then ch40100
+                CASE when change_100 is not null then ch100
+                ELSE NULL END AS ch_flag
+ from z1")
+
+ 
+ 
+------------------------------- Regression----------------------------------
+regress_tab_bbd <- felm(amountofloan ~ change_2540|year, data= z1)
+
+stargazer(regress_tab_bbd,title="Regression Results",single.row= TRUE, align=TRUE,type="text", out="new broadband.txt")
+str(df_filter_map_change_100_800)
+```
+
+
+
+```{r}
+-------------------------Plot US Map------------------------------------
+install.packages("usmap")
+library("usmap")
+df_filter_map_change_60_750<- sqldf("select * from filter_map_2018_2020 where Change1820 >=60 and Change1820 < 750 ;")
+df25$fips <- df25$countyid
+df2540$fips <- df2540$countyid
+df40100$fips <- df40100$countyid
+df100$fips <- df100$countyid
+
+head(df_filter_map_change_60_750)
+plot_usmap(data = df_filter_map_change_60_750, values = "Change1820") + scale_fill_continuous(
+    low = "green", high = "magenta",
+  name = "Broadband Percent Change > 60", label = scales::comma) + 
+  theme(legend.position = "bottom")
+  
+  ```
+  ------------------------------------------------------------------------------------- 
+  --------------------Regression UPB~ credit+x+y+z------------------------
+  ```{r}
+  install.packages("Matrix")
+  install.packages("dcolumn")
+  library("dcolumn")
+  head(df_all_numeric)
+  library(lfe)
+  regress_tab3 <- felm(Original_UPB ~ Credit_Score+Original_DTI_Ratio+Original_LTV+applicantincome |countyid , data= df_all_numeric)
+stargazer(regress_tab3,title="Regression Results",single.row= TRUE, align=TRUE,type="text", out="regtab3.txt")
+
+-------------------Regression Interest Rate ~ credit+x+y+z------------------------
+  install.packages("Matrix")
+  install.packages("dcolumn")
+  library("dcolumn")
+  head(df_all_numeric)
+  nrow(df_all_numeric)
+  library(lfe)
+  regress_tab4 <- felm(interest_rate ~ Credit_Score+Original_DTI_Ratio+applicantincome |year, data= df_all_numeric)
+ stargazer(regress_tab4,title="Regression Results",single.row= TRUE, align=TRUE,type="text", out="regtab4.txt")
+   -------------------------------BBD----------------------------------------------
+   head(final_race_eth_data)
+   final_race_eth_data$Credit_Score <- (final_race_eth_data$Credit_Score)/100
+   final_race_eth_data$ sd_interest <- sd(final_race_eth_data$interest_rate)
+   head(final_race_eth_data)
+   regress_tab6 <- felm(interest_rate~ ratio_ms_usage+Credit_Score+Original_DTI_Ratio+log(applicantincome) |countyid+year, data= final_race_eth_data)
+   stargazer(regress_tab6,title="Regression Results",single.row= TRUE, align=TRUE,type="text",covariate.labels = c("Broadband Usage", "CREDIT Score", "Debt to Income","log (Applicant Income)"),omit.stat=c("ser"),intercept.bottom = FALSE, out="regtab6.txt")
+**********************************************************************************************
+   stargazer(output, output2, type = "html", 
+          title            = "These are awesome results!",
+          covariate.labels = c("Temperature", "Wind speed", "Rain (inches)",
+                               "2nd quarter", "3rd quarter", "Fourth quarter"),
+          dep.var.caption  = "A better caption",
+          dep.var.labels   = "Flight delay (in minutes)")
+ *******************************************************************************************  
+   head(df_all_numeric)
+   regress_tab8 <- felm(Original_LTV~ ratio+Credit_Score+debt_to_income_ratio+applicantincome+property_value |year, data= final_race_eth_data)
+   stargazer(regress_tab8,title="Regression Results",covariate.labels = c("Broadband Penetration", "FICO Score", "Debt to Income","Applicant Income","Property Value"),omit.stat=c("ser"),single.row= TRUE, align=TRUE,type="text", out="New Table8.txt")
+   
+     regress_tab9 <- felm(interest_rate ~ ratio|countyid+year, data=final_race_eth_data) 
+   stargazer(regress_tab9,title="Regression Results",covariate.labels = c("Broadband Penetration"),single.row= TRUE, align=TRUE,type="text",omit.stat=c("ser"), out="regtab9.txt")
+   ------------------ Tab 6 and 9---------------------------
+   head(final_race_eth_data)
+   stargazer(regress_tab6,regress_tab9,title="Regression Results",covariate.labels = c("Broadband Usage","CREDIT Score ","Debt to Income","log Applicant Income","Broadband Penetration"),single.row= TRUE,omit.stat=c("ser"), align=TRUE,type="latex", out="Tab6and9.txt")
+   ---------------------------------------------------
+   regress_tab10 <- felm(Original_Combined_LTV~ ratio |countyid+year, data= final_race_eth_data)
+   stargazer(regress_tab10,title="Regression Results",covariate.labels = c("Broadband Penetration"),omit.stat=c("ser"),single.row= TRUE, align=TRUE,type="text", out="New tab10.txt")
+   
+    regress_tab010 <- felm(Original_Combined_LTV~ ratio_ms_usage |countyid+year, data= final_race_eth_data)
+   stargazer(regress_tab010,title="Regression Results",covariate.labels = c("Broadband Usage"),omit.stat=c("ser"),single.row= TRUE, align=TRUE,type="text", out="New tab10.txt")
+   
+ final_race_eth_data$Credit_Score <- (final_race_eth_data$Credit_Score)/100 
+   summary(final_race_eth_data$Credit_Score)
+  regress_tab11 <- felm(Original_Combined_LTV~ ratio+Credit_Score+Original_DTI_Ratio+poverty_percentage |year+countyid, data= final_race_eth_data)
+  
+  regress_tab11 <- felm(Original_Combined_LTV~ ratio+Credit_Score+Original_DTI_Ratio+poverty_percentage |year+countyid, data= final_race_eth_data)
+   stargazer(regress_tab11,title="Regression Results",single.row= TRUE,covariate.labels = c("Broadband Penetration"),omit.stat=c("ser"), align=TRUE,type="text", out="newtab11.txt")
+  
+  regress_tab011 <- felm(Original_Combined_LTV~ ratio_ms_usage+Credit_Score+Original_DTI_Ratio+poverty_percentage |year+countyid, data= final_race_eth_data)
+   stargazer(regress_tab011,title="Regression Results",single.row= TRUE,covariate.labels = c("Broadband Usage"),omit.stat=c("ser"), align=TRUE,type="text", out="newtab11.txt")
+   
+   stargazer(regress_tab10,regress_tab010,regress_tab102,regress_tab11,regress_tab011,title="Univariate(1), multivariate(2)",single.row= TRUE,omit.stat=c("ser"), align=TRUE,type="latex", out="newtab loan amount compare.txt")
+   
+   head(final_race_eth_data)
+   regress_raceeth <- felm( interest_rate~ ratio_ms_usage+derived_race+ Credit_Score+Original_DTI_Ratio |countyid+year, data= final_race_eth_data)
+   stargazer(regress_raceeth,title="Regression Results",single.row= TRUE, align=TRUE,type="latex", out="regtabraceeth.txt")
+   
+   ------------------------- Credit Score affect on ratio---------------------------
+   regress_tab7 <- felm(ratio ~ Credit_Score+Original_DTI_Ratio+applicantincome+Original_LTV |countyid+year, data= final_race_eth_data)
+   stargazer(regress_tab7,title="Regression Results",covariate.labels = c("FICO Score",)single.row= TRUE, align=TRUE,type="text", out="regtab7.txt")
+   -----------
+   
+
+----------------------------------Respondent id count-----------------------------
+df_respondent_county <-  sqldf("select countyid, countyname, statename, ratio, median_income, absolute_penetration, ratio_ms_usage, poverty_percentage, est_population, year, COUNT(distinct(respondentid)) AS res_count from final_race_eth_data group by  countyid, countyname, statename, ratio, median_income, absolute_penetration, ratio_ms_usage, poverty_percentage, est_population, year;")
+
+df_respondent_county_1 <- df_respondent_county[,c("ratio", "year","countyid","median_income","poverty_perecentage","est_population")]
+
+df_respondent_county <- na.rm(df_respondent_county, cols = c("median_income","poverty_perecentage","est_population"))
+summary(df_respondent_county$est_population)
+head(new_respondent_county)
+new_respondent_county <- sqldf(" select * from df_respondent_county where est_population not NULL and res_count not NULL ;")
+new_respondent_county$new_count <- new_respondent_county$res_count / new_respondent_county$est_population
+
+regress_res_tab5 <- felm(res_count ~ ratio_ms_usage +est_population|countyid+ year , data= new_respondent_county)
+  
+  stargazer(regress_res_tab5,title=" Regression lending agencies vs internet penetration",single.row= TRUE, align=TRUE,type="latex",covariate.labels = c("Broadband Usage","Population"),omit.stat=c("ser"), out="regtab5.txt")
+ 
+  
+  -------------- Segmented regression demographics-----------------------------------
+  
+```{r}
+distinct_df_demo_info <- sqldf("select distinct derived_race, derived_ethnicity, raceethnicity from  df_all_numeric  where derived_race not in ('Race Not Available','Free Form Text Only')
+and derived_ethnicity not in ('Ethnicity Not Available','Free Form Text Only') order by derived_race, derived_ethnicity, raceethnicity ;")
+print(distinct_df_demo_info)
+```
+
+
+--------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------------
+
+
+**************************************************************************************8
+**********************
+```{r}
+head(final_race_eth_data)
+summary(race_eth_data_1$Credit_Score)
+race_eth_data$race_factor <- as.factor(race_eth_data$race_factor)
+race_eth_data$ethnicity_factor <- as.factor(race_eth_data$ethnicity_factor)
+###################### Table 7 Countyid+year Fixed Effect###############################
+ regress_tab07 <- felm(ratio~ Credit_Score+applicantincome+est_population+derived_race+poverty_percentage+derived_ethnicity|countyid+year, data= final_race_eth_data)
+   stargazer(regress_tab07,title="Regression Results",dep.var.labels= "Broadband Penetration",covariate.labels = c("FICO Score","Applicant Income", "Population"),single.row= TRUE, align=TRUE,type="text", out="NewTable7.txt")
+```
+
+```{r}
+>memory.limit()
+[1] 1535.875
+> memory.limit(size=1000000)
+summary(alld)
+head(final_race_eth_data)
+       -------------------Interest Rate Low Income62k (Include in paper)------------------------------
+       df_low_app_income <- sqldf("select * from final_race_eth_data where applicantincome <= 62000 and applicantincome is not null;") 
+       regress_tab12 <- felm(interest_rate~ ratio+Credit_Score+debt_to_income_ratio+derived_race|year, data= df_low_app_income)
+   stargazer(regress_tab12,title="Regression Results",single.row= TRUE, align=TRUE,type="text", out="regtab12.txt")
+```
+   
+   -------------------Interest Rate High Income135k(Include in paper)------------------------------
+```{r}
+       df_high_app_income <- sqldf("select * from final_race_eth_data where applicantincome >= 135000 and applicantincome is not null;") 
+       regress_tab13 <- felm(interest_rate~ ratio+Credit_Score+debt_to_income_ratio+derived_race|year, data= df_high_app_income)
+       stargazer(regress_tab13,title="Regression Results",single.row= TRUE, align=TRUE,type="text", out="regtab13.txt")
+   
+       
+   stargazer(regress_tab12,regress_tab13,title="Low Income(1) vs High Income (2)",single.row= TRUE, align=TRUE,type="text",covariate.labels = c("Broadband Penetration","FICO Score"),omit.stat=c("ser"), out="New low vs high.txt")
+   head(final_race_eth_data)
+```
+   --------------------UPB------------------------------------------
+   -----------------Low Income------------------------------------------
+```{r}
+ head(df_low_app_income)
+       regress_tab15 <- felm(amountofloan~ ratio+Credit_Score+debt_to_income_ratio+derived_race|countyid+year, data= df_low_app_income)
+   stargazer(regress_tab15,title="Regression Results",covariate.labels = c("Broadband Penetration","FICO Score"),omit.stat=c("ser"),single.row= TRUE, align=TRUE,type="text", out="regtab15.txt")
+                              
+  -------------------Interest Rate High Income135k------------------------------
+       regress_tab16 <- felm(amountofloan ~ ratio+Credit_Score+debt_to_income_ratio+derived_race|countyid+year, data= df_high_app_income)
+       stargazer(regress_tab16,title="Regression Results",single.row= TRUE, covariate.labels = c("Broadband Penetration","FICO Score"),omit.stat=c("ser"),align=TRUE,type="text", out="regtab16.txt")
+       ------------------ LOW vs High-----------------------------
+       
+       stargazer(regress_tab15,regress_tab16,title="Unpaid Balance Low_Income(1) vs High_Income(2)",single.row= TRUE, covariate.labels = c("Broadband Penetration","FICO Score"),omit.stat=c("ser"),align=TRUE,type="text", out="New loan amount high vs low.txt")
+  
+  ------------------------------African American Vs Asian - Low Income------------------
+  summary(df_all_diff_med$applicantincome)
+  df_low_app_income_aa <- sqldf("select * from df_all_diff_med where derived_race = 'Black or African American'and  applicantincome <= 62000 and applicantincome is not null;") 
+   df_low_app_income_asian <- sqldf("select * from df_all_diff_med where derived_race = 'Asian' and applicantincome <= 62000 and applicantincome is not null;") 
+   
+   regress_tab17 <- felm(abs_int~ ratio_ms_usage+Credit_Score+debt_to_income_ratio|countyid+year, data= df_low_app_income_aa)
+   regress_tab18 <- felm(abs_int~ ratio_ms_usage+Credit_Score+debt_to_income_ratio|countyid+year, data= df_low_app_income_asian)
+       stargazer(regress_tab17,regress_tab18,title="Low Income Black(1),Asian(2)",single.row= TRUE, align=TRUE,type="text", out="Black vs Asian low incomeregtab18.txt")
+       
+       ------------------------------African American Vs Asian - High Income------------------
+  summary(df_high_app_income_aa$Credit_Score)
+  df_high_app_income_aa <- sqldf("select * from df_all_diff_med where derived_race = 'Black or African American'and  applicantincome >= 135000 and applicantincome is not null;") 
+   df_high_app_income_asian <- sqldf("select * from df_all_diff_med where derived_race = 'Asian' and applicantincome >= 135000 and applicantincome is not null;") 
+   
+   regress_tab19 <- felm(abs_int~ ratio_ms_usage+Credit_Score+debt_to_income_ratio|countyid+year, data= df_high_app_income_aa)
+   regress_tab20 <- felm(abs_int~ ratio_ms_usage+Credit_Score+debt_to_income_ratio|countyid+year, data= df_high_app_income_asian)
+       stargazer(regress_tab19,regress_tab20,title="High Income Black(1),Asian(2)",single.row= TRUE, align=TRUE,type="text", out="black vs Asian high incomeregtab19.txt")
+       
+       stargazer(regress_tab17,regress_tab19,regress_tab18,regress_tab20, title=" Black(1:Low & 2:High) and Asian(3:Low & 4:High)",covariate.labels = c("Broadband Usage","FICO Score","Debt to Income"),omit.stat=c("ser"),single.row= TRUE, align=TRUE,type="text", out="Table20.txt")
+       head(df_high_app_income_aa)
+```
+       ----------------same year 2018 , 2019,  2020----------
+```{r}
+   head(df_app18)    
+       df_app18 <- sqldf("select * from final_race_eth_data where  year = 2018;") 
+       df_app19 <- sqldf("select * from final_race_eth_data where  year = 2019;") 
+   df_app20 <- sqldf("select * from final_race_eth_data where  year = 2020;") 
+   
+   regress_tab21 <- felm(interest_rate~ ratio+Credit_Score+debt_to_income_ratio|year, data= df_app18)
+    regress_tab24 <- felm(interest_rate~ ratio+Credit_Score+debt_to_income_ratio|year, data= df_app19)
+   regress_tab22 <- felm(interest_rate~ ratio+Credit_Score+debt_to_income_ratio|year, data= df_app20)
+       stargazer(regress_tab21,regress_tab24,regress_tab22,title="2018(1) 2019(2) 2020(3) ",single.row= TRUE, align=TRUE,type="text",c("Broadband Penetration","Credit Score","Debt to Income"),omit.stat=c("ser"), out="2018_2019_2020.txt")
+```
+
+```{r}
+----------------------------Diff Median Interest Rate------------------------
+summary(df_all_diff_med$Credit_Score)
+df_all_diff_med <- sqldf("SELECT a.* , b.med_int_yr, a.interest_rate - b.med_int_yr AS diff_int_yr_med from final_race_eth_data a
+LEFT JOIN
+(SELECT year, median(interest_rate) as med_int_yr 
+from final_race_eth_data group by year) b
+ON a.year = b.year;")
+df_all_diff_med$abs_int <- abs(df_all_diff_med$diff_int_yr_med)
+---------------------------------------------------------------------------------------------
+head(df_all_diff_med$applicantincome)
+#### Divide Fico by 100
+df_all_diff_med$Credit_Score <- (df_all_diff_med$Credit_Score)/100
+############### Table 16 abs interest###########################################
+regress_tab016 <- felm(abs_int~ ratio_ms_usage+Credit_Score+debt_to_income_ratio+log(applicantincome)|countyid+year, data= df_all_diff_med)
+       stargazer(regress_tab016,title=" diff_med_int ",dep.var.labels="|Interest-Median Interest|",covariate.labels = c("Broadband Usage","Credit Score","Debt to Income"),single.row= TRUE, align=TRUE,type="text", out="diff interestNewTab16.txt")
+       
+regress_tab0016 <- felm(abs_int~ ratio+Credit_Score+debt_to_income_ratio+log(applicantincome)|countyid+year, data= df_all_diff_med)
+stargazer(regress_tab0016,title=" diff_med_int ",dep.var.labels="|Interest-Median Interest|",covariate.labels = c("Broadband Penetration","Credit Score","Debt to Income","log applicantincome"),single.row= TRUE, align=TRUE,type="text", out="diff interestNewTab16.txt")
+
+stargazer(regress_tab016,regress_tab0016,title=" diff_med_int ",dep.var.labels="|Interest-Median Interest|",covariate.labels = c("Broadband Usage","Broadband Penetration","Credit Score","Debt to Income","log ApplicantIncome"),single.row= TRUE, align=TRUE,type="latex", out="diff interestNewTab16.txt")
+
+```
+##################################################################################################
+```{r}
+head(df_all_diff_med)
+head(filter_map_2018_2020)
+--------------------Percent change in bbd data join------------------------
+df_18_20_change40 <- sqldf("select * from filter_map_2018_2020 where Change1820 >=25 and Change1820 <= 100 ;")
+head(df_18_20_change40)
+
+df_reg_40_200_correct_merge <- sqldf("select a.* , b.Change1820 from final_race_eth_data a INNER JOIN df_18_20_change40 b ON a.countyid = b.countyid and a.year=b.year;")
+summary(df_reg_40_200_correct_merge$Change1820)
+```
+
+
+       
+      BBD 40-200
+```{r}
+df_reg_40_200_correct_merge$Change1820 <- (df_reg_40_200_correct_merge$Change1820)/100       
+regress_tab29 <- felm(interest_rate~ Change1820+Credit_Score+Original_DTI_Ratio+applicantincome+derived_race|year, data= df_reg_40_200_correct_merge)
+       stargazer(regress_tab29,title=" Broadband Change>=40%",c("BBD Change","FICO Score"), omit.stat=c("ser"),single.row= TRUE, align=TRUE,type="text", out="new bbd change.txt")
+       
+```          
+--------------------------------Find counties BBD>100----------------------------
+```{r}
+nrow(df_reg_40_merge)
+df_high_bbd_change <- sqldf("select * from df_reg_40_merge where chgper1820>=400 and chgper1820 <= 800 ;")
+nrow(df_high_bbd_change)
+
+regress_tab31 <- felm(Original_UPB~ chgper1820+Credit_Score+Original_DTI_Ratio+applicantincome+derived_race|year, data= df_high_bbd_change)
+       stargazer(regress_tab31,title=" Broadband Change>=400%" ,single.row= TRUE, align=TRUE,type="text", out="tab31.txt")
+```
+
+```{r}
+***********************************Garbage***************************************
+******************************************************************************************
+       *race_eth_data <- sqldf("SELECT * ,
+                      CASE ratio WHEN White THEN 0
+                      WHEN 'White' THEN 1
+                      WHEN 'Native Hawaiian or Other Pacific Islander' THEN 2
+                      WHEN 'American Indian or Alaska Native' THEN 3
+                      WHEN 'Black or African American' THEN 4
+                      ELSE 5 END AS race_factor,
+                      CASE derived_ethnicity WHEN 'Not Hispanic or Latino' THEN 0
+                      WHEN 'Hispanic or Latino' THEN 1 ELSE 2 END AS ethnicity_factor
+                       from race_eth_data_1;")
+                       
+                       #race_eth_data_1[,race_factor:=ifelse(derived_race %in% c("Asian"),0,
+                            ifelse(derived_race %in% c("'White'"),1,
+                                   ifelse(derived_race %in% c("Native Hawaiian or Other Pacific Islander"),2,
+                                          ifelse(derived_race %in% c("American Indian or Alaska Native"),3,
+                                                 ifelse(derived_race %in% c("Black or African American"),4,NA)))))]
+```                                                 
+           
+       People not using broadband when they hace access to bbd    
+           
+```{r}                                      
+diff_usage_2018_2019_filter <- sqldf(" select * from diff_usage_2018_2019 where bbd_no_use > 0 and bbd_no_use <= 1;")
+diff_usage_2018_2019$bbd_no_use <- (diff_usage_2018_2019$ratio- diff_usage_2018_2019$ratio_ms_usage)/diff_usage_2018_2019$ratio
+head(diff_usage_2018_2019_filter)
+
+regress_tab101 <- felm(interest_rate~ bbd_no_use|year+countyid,data= diff_usage_2018_2019_filter)
+stargazer(regress_tab101,title="BBD Unused",single.row= TRUE, align=TRUE,type="text", out="BBD Unuse")
+
+
+regress_tab100 <- felm(interest_rate~ bbd_no_use+Credit_Score+Original_DTI_Ratio+log(applicantincome)|year+countyid,data= diff_usage_2018_2019_filter)
+  
+       stargazer(regress_tab6,regress_tab9,regress_tab100,regress_tab101,title="BBD Unused",single.row= TRUE, align=TRUE,type="latex", out="BBD Unuse compare")
+       
+regress_tab102 <- felm(Original_Combined_LTV~ bbd_no_use |countyid+year, data= diff_usage_2018_2019_filter)
+   stargazer(regress_tab102,title="Regression Results",covariate.labels = c("Broadband Unused"),omit.stat=c("ser"),single.row= TRUE, align=TRUE,type="text", out="New tab102.txt")
+   
+       
+
+```
+   
+       
+       
